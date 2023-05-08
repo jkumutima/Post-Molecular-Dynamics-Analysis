@@ -1,0 +1,24 @@
+vmd.cylinder <- function(edges, pdb, file="cylinder", cutoff=0.1, scale=1.0) {
+        if(is.pdb(pdb)) {
+      ca.inds <- atom.select(pdb, 'calpha', verbose=FALSE)
+      xyz <- pdb$xyz[ca.inds$xyz]
+    } else {
+      stop("PDB must be provided")
+    }
+
+    pdbfile <- paste(file, ".pdb", sep="")
+    vmdfile <- paste(file, ".vmd", sep="")
+
+    write.pdb(pdb, file=pdbfile)
+
+    ## Generate the script for drawing cylinders between C-alpha atoms.
+    cat("mol new ", basename(pdbfile), " type pdb\n",
+        "mol delrep 0 top\n",
+        "mol representation NewCartoon\n",
+        "mol color colorID 8\n",
+        "mol addrep top\n", file=vmdfile)
+
+    cat("display update off\n", file=vmdfile, append=TRUE)
+
+    if(any(edges[, 3]<0)) {
+        cat("draw color blue\n", file=vmdfile, append=TRUE)
