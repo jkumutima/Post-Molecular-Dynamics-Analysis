@@ -1,0 +1,62 @@
+############ PARAMETERS YOU CAN ADJUST ################################
+# Filename of the first contact statistics file
+contfile1 = '../contact/contact.statistics'
+
+# Filename of the second contact statistics file
+contfile2 = '../../../../../P53_cis/production/analysis/dcna/contact/contact.statistics'
+
+# Filename of the pdb file
+pdbfile = 'p53.pdb'
+
+# threshold to define "stable" contact (e.g. 90% or 0.9)
+qcutoff = 0.9
+
+# threshold to define "significant" contact difference between two states
+# (0.1 means if contact frequency difference between the two states is less than 10%, ignore them)
+fcutoff = 0.1
+
+# number of communities to show; If set `NULL`, use the automatically determined number.
+num.comm = 12
+
+
+############# DON'T CHANGE FOLLOWING LINES (UNLESS YOU KNOW WHAT IT MEANS) ##########
+library(bio3d)
+library(igraph)
+source('funs.R')
+source('vmd.cylinder.R')
+
+freqs <- lapply(list(f1=contfile1, f2=contfile2), function(i) {
+   freq <- read.table(i)
+   freq[(freq[, 1] %in% c(1:6)) & !(freq[, 2] %in% c(1:6)), 3] <- 0
+   freq[!(freq[, 1] %in% c(194:196)) & (freq[, 2] %in% c(194:196)), 3] <- 0
+   freq[(freq[, 1] %in% c(194:196)) & !(freq[, 2] %in% 197), 3] <- 0
+   freq
+})
+
+pdb <- read.pdb(pdbfile)
+nets <- buildnet(freqs, pdb, qcut=qcutoff, fcut=fcutoff, ncom=num.comm)
+#plot_community(nets[[1,2]], pdb=pdb, fcut=fcutoff)
+
+f1 <- freqs$f1
+f2 <- freqs$f2
+f1[, 3] <- f1[, 3]/max(f1[, 3])
+f2[, 3] <- f2[, 3]/max(f2[, 3])
+df <- f1
+df[, 3] <- f2[, 3] - f1[, 3]
+
+# exclude 6 and 3 residues from N- and C-terminus, respectively
+#df[(df[, 1] %in% c(1:6, 194:196)) |
+#(df[, 2] %in% c(1:6, 194:196)), 3] <- 0
+
+# mask intra-community contacts
+comm <- nets[[1,2]]$communities$membership
+df[comm[df[, 1]] == comm[df[, 2]], 3] <- 0
+vmd.cylinder(df, pdb=pdb, file='inter_community_bar', cutoff=fcutoff)
+
+
+## key contacts between comm 2 (red) and comm 3 (gray)
+tmpdf <- df[(comm[df[, 1]] == 2 & comm[df[, 2]] == 3) | (comm[df[, 1]]==3 & comm[df[, 2]] ==2), ]
+tmpkeypdf <- tmpdf[abs(tmpdf[, 3]) >= 0.1 & (tmpdf[, 2] - tmpdf[, 1])>2, ]
+tmpkeypdf <- tmpkeypdf[order(abs(tmpkeypdf[, 3]), decreasing=TRUE), ]
+resno <- pdb$atom[pdb$calpha, "resno"] + 93
+                                                                                                                                                                                          1,0-1         Top
