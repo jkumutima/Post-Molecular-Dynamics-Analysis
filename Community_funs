@@ -1,0 +1,62 @@
+prune.net=FALSE, ncom=NULL, ncore=NULL) {
+  if(!is.list(freqs) && length(freqs)<2)
+     stop('Input `freqs` must be a list and has at least two components.')
+
+  require(bio3d)
+  ncore <- setup.ncore(ncore)
+
+  freqs <- lapply(freqs, function(f) {
+     f[, 3] <- f[, 3] / max(f[, 3])
+     f
+  })
+  n <- length(freqs)
+  np <- pairwise(n)
+
+#  ft <- sapply(freqs, '[', 3)
+#  if(is.matrix(ft) && ncol(ft)>1) favg <- rowMeans(ft)
+#  else favg <- ft
+
+  ## find consensus stable contacts.
+  fdiff <- matrix(vector('list', n*n), n, n)
+  fdiff[lower.tri(fdiff)] <- parallel::mclapply(1:nrow(np), function(i) {
+     ii <- np[i, 1]; jj <- np[i, 2]
+     freqs[[jj]][, 3] - freqs[[ii]][, 3]
+  }, mc.cores=ncore)
+  fdiff <- t(fdiff)
+  fdiff[lower.tri(fdiff)] <- parallel::mclapply(1:nrow(np), function(i) {
+     ii <- np[i, 1]; jj <- np[i, 2]
+     freqs[[ii]][, 3] - freqs[[jj]][, 3]
+  }, mc.cores=ncore)
+
+  flags <- rep(TRUE, nrow(freqs[[1]]))
+  for(i in 1:n) {
+    flags <- flags & freqs[[i]][, 3]>=qcut
+  }
+  for(i in 1:nrow(np)) {
+     flags <- flags & abs(fdiff[[np[i, 1], np[i, 2]]])<fcut
+  }
+#  flags <- flags | (freqs[[1]][, 2] - freqs[[1]][, 1]) <= 2  # force 1-3 contact
+#  flags <- flags & !((freqs[[1]][, 2] - freqs[[1]][, 1]) == 2)  # force 1-3 contact out
+#  flags <- flags & (freqs[[1]][, 2] - freqs[[1]][, 1]) >= scut # non-local contact only
+
+  ## network shell
+  ca.inds <- atom.select(pdb, elety='CA', verbose=FALSE)
+#  ca.inds <- combine.select(ca.inds, atom.select(pdb, elety="C4'", verbose=FALSE), operator='+', verbose=FALSE)
+#  ca.inds <- combine.select(ca.inds, atom.select(pdb, resid=c("FEM", "WAT"), verbose=FALSE), operator='+', verbose=FALSE)
+  cij <- matrix(0, length(ca.inds$atom), length(ca.inds$atom))
+  cij[as.matrix(apply(freqs[[1]][, 1:2], 2, match, pdb$atom$resno[ca.inds$atom]))] <-
+      as.numeric(flags)
+  cij[lower.tri(cij)] <- t(cij)[lower.tri(cij)]
+
+  net <- cna(cij, cutoff.cij=0.0)
+  if(!is.null(ncom)) {
+     net <- prunenet(net, ncom=ncom)
+  } else if(prune.net==TRUE) {
+     net <- prunenet(net, cutoff=mcut)
+  }
+
+  ## update community networks
+  nets <- matrix(vector('list', n*n), n, n)
+  nets[upper.tri(nets)] <- parallel::mclapply(fdiff[upper.tri(fdiff)], function(fdiff) {
+     dcij <- matrix(0, length(ca.inds$atom), length(ca.inds$atom))
+                                                                                                                                                                                          1,1           Top
