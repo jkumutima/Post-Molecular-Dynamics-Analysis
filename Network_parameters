@@ -1,0 +1,159 @@
+#Build the network i.e build the graph from the simulated protein. 
+#The nodes will be residues and the edges will be contacts(covalbonds, H-bonds, electroostaic, etc..
+#but I can set the minimum distance to deine a contact )
+#Code to generate the adcency matrix from the simulation 1 frame pdb structure.
+
+library(bio3d)
+pdb_all <- read.pdb("ApopCypD_1000frames.pdb", multi = TRUE)
+pdb_all$xyz <- pdb_all$xyz[1:1000, ]
+#pdb
+#pdb$xyz
+
+#cm <- cmap(pdb, dcut=4.5, scut=0)
+#cm
+#cm <- cmap(pdb, dcut=4.5, scut=0, mask.lower=FALSE)
+#cm  #cm is basically yhe matrix a.k.a adjacency matrix
+#dim(cm)
+#cm[1:10, 1:10]
+#plot(cm)
+#plot.cmap(cm) # this is basically the adjaceny matrix
+
+#build the graph from the adjacency matrix. Here a reference for such: 
+#https://r-graph-gallery.com/257-input-formats-for-network-charts.html
+#library
+
+library(igraph)
+
+# Create data
+#set.seed(10)
+#data <- matrix(sample(0:2, 25, replace=TRUE), nrow=5)
+#data <- cm
+#colnames(data) = rownames(data) = LETTERS[1:5]
+
+# build the graph object
+#network <- graph_from_adjacency_matrix(adjmatrix = cm,
+                                       # mode =  "undirected")
+
+# plot it
+#plot(network)
+# make the csv for the adjacency matrix
+#write.table(x = cm, file = "cm.csv", sep = ",", row.names = FALSE, col.names = FALSE)
+
+
+
+#codes to write the 1000 frames and find parameters for all of them
+no_graphs <- 1000
+no_residuals <- 164
+#restuls_frame <- data.frame(graph_no = c(1:no_graphs),
+#                            matrix( data = 0, nrow = no_graphs , ncol = no_residuals)   )
+results_matrix <- matrix( data = 0, nrow = no_graphs , ncol = no_residuals)
+
+dim(results_matrix)
+
+#Parameters
+Density <- NULL
+Connectivity <- NULL
+Coefficient <- NULL
+Distribution <-  NULL
+
+for(i in c(1:no_graphs )){
+  
+
+
+  name_file <- "ApopCypD_1000frames.pdb"
+  
+  pdb <- read.pdb(name_file)
+  pdb$xyz <- pdb_all$xyz[i,] 
+  
+  
+  cm <- cmap(pdb, dcut=4.5, scut=0, mask.lower=FALSE)
+  cm  #cm is basically yhe matrix a.k.a adjacency matrix
+  dim(cm)
+  cm[1:10, 1:10]
+  
+
+  network <- graph_from_adjacency_matrix(adjmatrix = cm,
+                                         mode =  "undirected")
+  
+  
+  results_matrix[i,] <- edge_density(network, loops=FALSE) 
+  
+  
+  
+ 
+  
+
+
+
+
+# Design how the graph that i called network will be lay out
+#network_layout <- layout_with_fr(graph = network, niter = 20000) # network_layout <- layout_in_circle(network) or 
+                                                                  #network_layout <- layout_with_kk(network)
+
+#decoration parameters for the graph
+#pdf(file = paste0(i, ".pdf"), width = 100, height =100)
+#plot(x = network, 
+     #layout = network_layout,
+     #edge.arrow.size=.5, 
+     #vertex.color="gold", 
+     #vertex.size=5, 
+     #vertex.frame.color="gray", 
+     #vertex.label.color="black", 
+     #vertex.label.cex=1, 
+     #vertex.label.dist=2, 
+     #edge.curved=0.2 )
+##dev.off()
+
+
+
+
+
+
+##pdf(file ="3.pdf", width = 100, height =100)
+# plot it
+#plot(x = network,
+     # mark.groups = list(),
+     #mark.shape = 1/2,
+     #mark.col = rainbow(length(mark.groups), alpha = 0.3),
+     #mark.border = rainbow(length(mark.groups), alpha = 1),
+     #mark.expand = 15,
+    # )
+#dev.off()
+
+
+
+#reduce number of nodes a.k.a community so that the graph looks less complicated
+#how do you define node similarity?
+
+
+
+#Density of the graph
+Density <- c(Density, edge_density(network, loops=FALSE)) 
+
+#Connectivity of the graph
+Connectivity <- c(Connectivity, edge_connectivity(network, 164, 1))
+
+#Clustering coefficient
+Coefficient <- c(Coefficient, transitivity(network, type = "localaverage"))
+
+# Degree distribution
+Distribution <- c(Distribution, degree_distribution(network))
+
+
+}
+
+
+plot(Density, type = "o")
+plot(Connectivity, type = "o")
+plot(Coefficient, type = "o")
+plot(Distribution, type = "p")
+hist(Distribution)
+
+Distribution < 0.1
+Distribution[Distribution < 0.1]
+hist(Distribution[Distribution < 0.1])
+# maybe it moves from poisson to scale free. Capture evolutionary changes in the network. THe evolutionary changes can tell the functional
+# fiind if the ocnforrmatoinial converges into soemething.
+
+
+#geetplot(success, dpois(success, lambda=5), type='h')
